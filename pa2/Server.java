@@ -40,7 +40,7 @@ public class Server {
 
       String message = "";
 
-      // loop to stay on the client connectoin until disconnection
+      // loop to stay on the client connection until disconnection
       while (true) {
         try {
           // reading file name
@@ -55,8 +55,14 @@ public class Server {
               break;
           }
 
-          // look for the file requested
+          // look for the file requested and block path traversal attempts
           File requestedFile = new File(dir, message);
+          if (!requestedFile.getCanonicalPath().startsWith(dir.getCanonicalPath())) {
+            out.writeUTF("ERROR");
+            out.writeUTF("File not found");
+            out.flush();
+            continue;
+          }
           if (!requestedFile.exists() || !requestedFile.isFile()) {
             out.writeUTF("ERROR");
             out.writeUTF("File not found");
@@ -87,11 +93,11 @@ public class Server {
             // finished sending 
             System.out.println("Sent file: " + requestedFile.getName() + " (" + requestedFile.length() + " bytes)");
           } catch (IOException e) {
-            // Something is wrong while reading 
+            // log the error server-side only
             System.out.println("File transfer error: " + e);
-
-            out.writeUTF("Server Exceptin Error: " + e.getMessage());
-            out.flush();
+            try { 
+              socket.close(); 
+            } catch (IOException ex) { /* ignore */ }
           } finally {
             // closing the file stream 
             if (fileIn != null) {

@@ -9,7 +9,7 @@ public class Client {
   private DataOutputStream out = null;
   private DataInputStream serverIn = null;
 
-  // Client side folder for receving files 
+  // Client side folder for receiving files 
   private static final String CLIENT_DIR = "client_downloads";
 
   // # of bytes to read at a time 
@@ -68,10 +68,6 @@ public class Client {
         // shutdown process 
         if (status.equals("BYE")) {
           String res = serverIn.readUTF();
-
-          long end = System.currentTimeMillis();
-          long rtt = end - start;
-
           System.out.println("Server: " + res);
           System.out.println("exit");
           break;
@@ -120,6 +116,10 @@ public class Client {
               remaining -= bytesRead;
             }
             fileOut.flush();
+
+            if (remaining != 0) {
+              System.out.println("Warning: File transfer incomplete. " + remaining + " bytes missing.");
+            }
 
           } finally {
             // closing the output stream 
@@ -178,7 +178,7 @@ public class Client {
       System.out.println("Std Dev: " + std + " ms");
     }
 
-    // clsoing client resources
+    // closing client resources
     try {
       in.close();
       out.close();
