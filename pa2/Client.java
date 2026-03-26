@@ -85,9 +85,9 @@ public class Client {
           long rtt = end - start;
 
           System.out.println("Server: " + res);
-          System.out.println("RTT: " + rtt + " ms");
-
-          if (!message.equalsIgnoreCase("bye")) {
+          //only count rtt time if the message isn't an exit message or an incorrect file name warning 
+          if (!message.equalsIgnoreCase("bye") && !res.equals("File not found")) {
+            System.out.println("RTT: " + rtt + " ms");
             roundTripTimes.add(rtt);
           }
 
