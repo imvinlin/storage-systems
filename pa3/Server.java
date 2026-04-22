@@ -1,6 +1,8 @@
 package pa3;
 import java.io.*;
 import java.net.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
  
 public class Server {
   private ServerSocket server = null;
@@ -12,6 +14,12 @@ public class Server {
   private static final int BUFFER_SIZE = 4096;
  
   public Server(int port) {
+    // tracks live client handler threads. Once at least one client has connected and this
+    // counter falls back to 0, the last handler closes the ServerSocket so the accept()
+    // loop unblocks and the JVM exits — this is the "all users said bye" shutdown the spec asks for.
+    AtomicInteger activeClients = new AtomicInteger(0);
+    AtomicBoolean everConnected = new AtomicBoolean(false);
+
     // Network Connection
     try {
       // Double checking server folder exists
@@ -19,24 +27,35 @@ public class Server {
       if (!dir.exists()) {
         dir.mkdirs();
       }
- 
+
       // Server start process — now accepts multiple clients in a loop
       server = new ServerSocket(port);
       System.out.println("Server Started on " + InetAddress.getLocalHost().getHostAddress());
       System.out.println("Server file directory: " + dir.getAbsolutePath());
       System.out.println("Waiting for clients...");
- 
+
       // keep accepting new clients and hand each off to its own thread
       while (true) {
-        Socket clientSocket = server.accept();
+        Socket clientSocket;
+        try {
+          clientSocket = server.accept();
+        } catch (SocketException se) {
+          // expected when the last handler closes the server socket for shutdown
+          break;
+        }
         System.out.println("Client connected: " + clientSocket.getInetAddress().getHostAddress());
- 
+
+        activeClients.incrementAndGet();
+        everConnected.set(true);
+
         // spawn a handler thread so this loop is free to accept the next client immediately
-        ClientHandler handler = new ClientHandler(clientSocket, dir);
+        ClientHandler handler = new ClientHandler(clientSocket, dir, activeClients, everConnected, server);
         Thread t = new Thread(handler);
         t.start();
       }
- 
+
+      System.out.println("All clients disconnected — server exiting.");
+
     } catch (IOException i) {
       System.out.println("Server error: " + i);
     }
@@ -47,10 +66,17 @@ public class Server {
  
     private final Socket socket;
     private final File serverDir;
- 
-    public ClientHandler(Socket socket, File serverDir) {
+    private final AtomicInteger activeClients;
+    private final AtomicBoolean everConnected;
+    private final ServerSocket serverSocket;
+
+    public ClientHandler(Socket socket, File serverDir, AtomicInteger activeClients,
+                         AtomicBoolean everConnected, ServerSocket serverSocket) {
       this.socket = socket;
       this.serverDir = serverDir;
+      this.activeClients = activeClients;
+      this.everConnected = everConnected;
+      this.serverSocket = serverSocket;
     }
  
     @Override
@@ -112,6 +138,16 @@ public class Server {
           System.out.println("Error closing client resources: " + e);
         }
         System.out.println("Client disconnected: " + socket.getInetAddress().getHostAddress());
+
+        // if we were the last live handler, close the server socket so the accept loop can exit
+        if (activeClients.decrementAndGet() == 0 && everConnected.get()) {
+          System.out.println("Last client disconnected — closing server socket.");
+          try {
+            serverSocket.close();
+          } catch (IOException e) {
+            System.out.println("Error closing server socket: " + e);
+          }
+        }
       }
     }
  

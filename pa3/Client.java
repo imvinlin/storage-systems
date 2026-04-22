@@ -277,7 +277,7 @@ public class Client {
  
   public static void main(String[] args) {
     if (args.length < 1) {
-      System.out.println("Usage: java Client <serverIP [port]");
+      System.out.println("Usage: java Client <serverIP> [port]");
       return;
     }
  
